@@ -1,20 +1,55 @@
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import CropEditor from "./CropEditor.jsx";
+import getCroppedImg from "../utils/getCroppedImg.js";
 
-const EditPanel = ({ image }) => {
+const EditPanel = ({ image, onApplyCrop }) => {
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
-  const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
-
-  const onCropComplete = useCallback((_, cropPixels) => {
-    setCroppedAreaPixels(cropPixels);
-  }, []);
+  const [cropRect, setCropRect] = useState({ x: 0, y: 0, width: 0, height: 0 });
+  const [editorSize, setEditorSize] = useState({ width: 0, height: 0 });
+  const [imageLayout, setImageLayout] = useState({
+    x: 0,
+    y: 0,
+    width: 0,
+    height: 0
+  });
+  const [applyLoading, setApplyLoading] = useState(false);
+  const [cropError, setCropError] = useState("");
 
   const handleReset = () => {
     setCrop({ x: 0, y: 0 });
     setZoom(1);
     setRotation(0);
+    setCropRect((current) => ({
+      ...current,
+      x: Math.max(0, Math.round((editorSize.width - current.width) / 2)),
+      y: Math.max(0, Math.round((editorSize.height - current.height) / 2))
+    }));
+    setCropError("");
+  };
+
+  const handleApplyCrop = async () => {
+    try {
+      setApplyLoading(true);
+      setCropError("");
+
+      const croppedImage = await getCroppedImg({
+        imageSrc: image,
+        cropRect,
+        editorSize,
+        imageLayout,
+        imageOffset: crop,
+        zoom,
+        rotation
+      });
+
+      onApplyCrop(croppedImage);
+    } catch (error) {
+      setCropError(error.message || "Unable to apply crop.");
+    } finally {
+      setApplyLoading(false);
+    }
   };
 
   if (!image) {
@@ -28,9 +63,19 @@ const EditPanel = ({ image }) => {
           <span className="step-label">Step 3</span>
           <h2>Edit Photo</h2>
         </div>
-        <button className="ghost-button" type="button" onClick={handleReset}>
-          Reset
-        </button>
+        <div className="edit-actions">
+          <button className="ghost-button" type="button" onClick={handleReset}>
+            Reset
+          </button>
+          <button
+            className="apply-button"
+            type="button"
+            disabled={!cropRect.width || applyLoading}
+            onClick={handleApplyCrop}
+          >
+            {applyLoading ? "Applying..." : "Apply Crop"}
+          </button>
+        </div>
       </div>
 
       <CropEditor
@@ -38,10 +83,13 @@ const EditPanel = ({ image }) => {
         crop={crop}
         zoom={zoom}
         rotation={rotation}
+        cropRect={cropRect}
+        editorSize={editorSize}
+        imageLayout={imageLayout}
         setCrop={setCrop}
-        setZoom={setZoom}
-        setRotation={setRotation}
-        onCropComplete={onCropComplete}
+        setCropRect={setCropRect}
+        setEditorSize={setEditorSize}
+        setImageLayout={setImageLayout}
       />
 
       <div className="control-grid">
@@ -72,10 +120,15 @@ const EditPanel = ({ image }) => {
         </label>
       </div>
 
-      {croppedAreaPixels && (
+      {cropError && (
+        <p className="crop-error" role="alert">
+          {cropError}
+        </p>
+      )}
+
+      {cropRect.width > 0 && (
         <p className="crop-meta">
-          Crop area: {Math.round(croppedAreaPixels.width)} x{" "}
-          {Math.round(croppedAreaPixels.height)} px
+          Crop area: {Math.round(cropRect.width)} x {Math.round(cropRect.height)} px
         </p>
       )}
     </section>

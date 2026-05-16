@@ -13,6 +13,7 @@ function App() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState("");
   const [processedImage, setProcessedImage] = useState("");
+  const [editedImage, setEditedImage] = useState("");
   const [activeColor, setActiveColor] = useState("");
   const [removeLoading, setRemoveLoading] = useState(false);
   const [loadingColor, setLoadingColor] = useState("");
@@ -34,6 +35,7 @@ function App() {
   const handleFileSelect = (file) => {
     setSelectedFile(file);
     setProcessedImage("");
+    setEditedImage("");
     setActiveColor("");
     setHasColorChange(false);
     setError("");
@@ -55,6 +57,7 @@ function App() {
       }
 
       setProcessedImage(data.processedImage);
+      setEditedImage("");
       setActiveColor("");
       setHasColorChange(false);
     } catch (err) {
@@ -80,6 +83,7 @@ function App() {
       }
 
       setProcessedImage(data.processedImage);
+      setEditedImage("");
       setActiveColor(color);
       setHasColorChange(true);
     } catch (err) {
@@ -128,8 +132,13 @@ function App() {
         </div>
 
         <div className="right-stack">
-          <Result image={processedImage} />
-          {hasColorChange && <EditPanel image={processedImage} />}
+          <Result image={editedImage || processedImage} />
+          {hasColorChange && (
+            <EditPanel
+              image={editedImage || processedImage}
+              onApplyCrop={setEditedImage}
+            />
+          )}
         </div>
       </div>
     </main>

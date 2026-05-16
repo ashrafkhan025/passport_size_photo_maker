@@ -191,6 +191,7 @@ button:disabled {
 
 .primary-button,
 .ghost-button,
+.apply-button,
 .color-button,
 .download-link {
   border: 0;
@@ -224,6 +225,24 @@ button:disabled {
 
 .ghost-button:hover {
   background: #dce6ef;
+}
+
+.apply-button {
+  min-height: 40px;
+  padding: 0 16px;
+  background: #247a8b;
+  color: #ffffff;
+}
+
+.apply-button:not(:disabled):hover {
+  background: #1b6675;
+}
+
+.edit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: end;
+  gap: 10px;
 }
 
 .spinner {
@@ -325,6 +344,139 @@ button:disabled {
   overflow: hidden;
   border-radius: 8px;
   background: #0f172a;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.cropper-shell.is-panning {
+  cursor: grabbing;
+}
+
+.crop-stage-image {
+  position: absolute;
+  z-index: 1;
+  display: block;
+  max-width: none;
+  max-height: none;
+  transform-origin: center;
+  will-change: transform, left, top;
+  pointer-events: none;
+}
+
+.crop-dark-overlay {
+  position: absolute;
+  z-index: 2;
+  background: rgba(6, 12, 22, 0.62);
+  pointer-events: none;
+}
+
+.crop-rnd {
+  z-index: 3;
+}
+
+.crop-box {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border: 2px solid #ffffff;
+  background:
+    linear-gradient(to right, rgba(255, 255, 255, 0.42) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.42) 1px, transparent 1px),
+    rgba(255, 255, 255, 0.04);
+  background-size: 33.333% 33.333%;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.24),
+    0 12px 38px rgba(0, 0, 0, 0.24);
+  cursor: move;
+}
+
+.crop-box::before,
+.crop-box::after {
+  position: absolute;
+  content: "";
+  pointer-events: none;
+}
+
+.crop-box::before {
+  inset: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+}
+
+.crop-box::after {
+  inset: -2px;
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1px rgba(36, 122, 139, 0.4);
+}
+
+.rnd-handle {
+  position: absolute;
+  z-index: 4;
+  background: #ffffff;
+  border: 2px solid #247a8b;
+  box-shadow: 0 2px 9px rgba(0, 0, 0, 0.25);
+}
+
+.rnd-handle.corner {
+  width: 18px !important;
+  height: 18px !important;
+  border-radius: 50%;
+}
+
+.rnd-handle.side {
+  border-radius: 999px;
+}
+
+.rnd-handle.top,
+.rnd-handle.bottom {
+  left: 50% !important;
+  width: 48px !important;
+  height: 10px !important;
+  transform: translateX(-50%);
+}
+
+.rnd-handle.left,
+.rnd-handle.right {
+  top: 50% !important;
+  width: 10px !important;
+  height: 48px !important;
+  transform: translateY(-50%);
+}
+
+.rnd-handle.top {
+  top: -6px !important;
+}
+
+.rnd-handle.right {
+  right: -6px !important;
+}
+
+.rnd-handle.bottom {
+  bottom: -6px !important;
+}
+
+.rnd-handle.left {
+  left: -6px !important;
+}
+
+.rnd-handle.top-right {
+  top: -9px !important;
+  right: -9px !important;
+}
+
+.rnd-handle.bottom-right {
+  right: -9px !important;
+  bottom: -9px !important;
+}
+
+.rnd-handle.bottom-left {
+  bottom: -9px !important;
+  left: -9px !important;
+}
+
+.rnd-handle.top-left {
+  top: -9px !important;
+  left: -9px !important;
 }
 
 .live-preview-wrap {
@@ -350,12 +502,10 @@ button:disabled {
   background: #f8fafc;
 }
 
-.live-preview img {
+.live-preview canvas {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  transform-origin: center;
-  transition: transform 120ms ease;
 }
 
 .control-grid {
@@ -395,6 +545,13 @@ button:disabled {
   margin: 14px 0 0;
   color: #697789;
   font-size: 0.9rem;
+}
+
+.crop-error {
+  margin: 14px 0 0;
+  color: #9b2d22;
+  font-size: 0.9rem;
+  font-weight: 700;
 }
 
 .alert {

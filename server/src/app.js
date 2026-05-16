@@ -7,6 +7,7 @@ import { fileURLToPath } from "url";
 
 import removeBgRoutes from "./routes/removeBgRoutes.js";
 import changeBackgroundRoutes from "./routes/changeBackgroundRoutes.js";
+import generatePassportRoutes from "./routes/generatePassportRoutes.js";
 import { notFoundHandler, errorHandler } from "./middleware/errorMiddleware.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -41,7 +42,8 @@ app.get("/", (_req, res) => {
     endpoints: {
       health: "/health",
       removeBackground: "POST /api/remove-bg",
-      changeBackground: "POST /api/change-background"
+      changeBackground: "POST /api/change-background",
+      generatePassport: "POST /api/generate-passport"
     }
   });
 });
@@ -51,6 +53,7 @@ app.use("/output", express.static(path.join(__dirname, "..", "output")));
 
 app.use("/api", removeBgRoutes);
 app.use("/api", changeBackgroundRoutes);
+app.use("/api", generatePassportRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
