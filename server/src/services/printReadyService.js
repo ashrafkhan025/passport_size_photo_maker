@@ -1,21 +1,24 @@
-import fs from "fs/promises";
+import fs from "fs";
+import fsp from "fs/promises";
 import path from "path";
 import crypto from "crypto";
+import PDFDocument from "pdfkit";
 import sharp from "sharp";
 import { outputDir, toPublicUrl } from "../config/storage.js";
 import AppError from "../utils/AppError.js";
 
 const printDpi = 300;
+const pdfPointsPerInch = 72;
 const mmPerInch = 25.4;
 
 const countrySizes = {
   india: { widthMm: 35, heightMm: 45, label: "India 35x45mm" },
-  us: { widthMm: 50.8, heightMm: 50.8, label: "US 2x2 inch" },
-  canada: { widthMm: 50, heightMm: 70, label: "Canada 50x70mm" },
-  custom: { widthMm: 35, heightMm: 45, label: "Custom" }
+  us: { widthMm: 50.8, heightMm: 50.8, label: "US Visa 2x2 inch" },
+  canada: { widthMm: 50, heightMm: 70, label: "Canada 50x70mm" }
 };
 
-const mmToPx = (mm) => Math.round((mm / mmPerInch) * printDpi);
+const mmToPx = (mm) => Math.round((mm * printDpi) / mmPerInch);
+const pxToPdfPoints = (px) => (px / printDpi) * pdfPointsPerInch;
 
 const getBufferFromDataUrl = (imageUrl) => {
   const match = imageUrl.match(/^data:image\/(?:png|jpe?g|webp);base64,(.+)$/);
@@ -51,6 +54,14 @@ const getOutputFilenameFromUrl = (imageUrl) => {
   return filename;
 };
 
+const ensureFileExists = async (filePath) => {
+  try {
+    await fsp.access(filePath);
+  } catch {
+    throw new AppError("Image file not found in output folder.", 404, "IMAGE_NOT_FOUND");
+  }
+};
+
 const getInputImage = async (imageUrl) => {
   const dataUrlBuffer = getBufferFromDataUrl(imageUrl);
 
@@ -66,12 +77,16 @@ const getInputImage = async (imageUrl) => {
   return inputPath;
 };
 
-const ensureFileExists = async (filePath) => {
-  try {
-    await fs.access(filePath);
-  } catch {
-    throw new AppError("Image file not found in output folder.", 404, "IMAGE_NOT_FOUND");
+const getPassportSize = ({ country, widthMm, heightMm }) => {
+  if (country === "custom") {
+    return {
+      widthMm,
+      heightMm,
+      label: `Custom ${widthMm}x${heightMm}mm`
+    };
   }
+
+  return countrySizes[country];
 };
 
 const calculateGrid = (copies) => {
@@ -87,19 +102,36 @@ const calculateGrid = (copies) => {
   return { rows, columns };
 };
 
-const getPassportSize = ({ country, widthMm, heightMm }) => {
-  if (country === "custom" && widthMm && heightMm) {
-    return {
-      widthMm,
-      heightMm,
-      label: `Custom ${widthMm}x${heightMm}mm`
-    };
-  }
+const createPdfFromPng = ({ pngPath, pdfPath, widthPx, heightPx }) => {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({
+      autoFirstPage: false,
+      compress: true,
+      info: {
+        Title: "Print Ready Passport Sheet",
+        Producer: "AI Passport Photo"
+      }
+    });
+    const stream = fs.createWriteStream(pdfPath);
 
-  return countrySizes[country];
+    stream.on("finish", resolve);
+    stream.on("error", reject);
+    doc.on("error", reject);
+
+    doc.pipe(stream);
+    doc.addPage({
+      size: [pxToPdfPoints(widthPx), pxToPdfPoints(heightPx)],
+      margin: 0
+    });
+    doc.image(pngPath, 0, 0, {
+      width: pxToPdfPoints(widthPx),
+      height: pxToPdfPoints(heightPx)
+    });
+    doc.end();
+  });
 };
 
-export const generatePassportSheet = async ({ imageUrl, country, copies, widthMm, heightMm }) => {
+export const generatePrintReadySheet = async ({ imageUrl, country, copies, widthMm, heightMm }) => {
   const passportSize = getPassportSize({ country, widthMm, heightMm });
 
   if (!passportSize) {
@@ -107,14 +139,12 @@ export const generatePassportSheet = async ({ imageUrl, country, copies, widthMm
   }
 
   const inputImage = await getInputImage(imageUrl);
-
   const photoWidth = mmToPx(passportSize.widthMm);
   const photoHeight = mmToPx(passportSize.heightMm);
-  const spacing = 40;
-  const margin = 60;
+  const spacing = mmToPx(6);
   const { rows, columns } = calculateGrid(copies);
-  const sheetWidth = columns * photoWidth + (columns - 1) * spacing + margin * 2;
-  const sheetHeight = rows * photoHeight + (rows - 1) * spacing + margin * 2;
+  const sheetWidth = columns * photoWidth + (columns + 1) * spacing;
+  const sheetHeight = rows * photoHeight + (rows + 1) * spacing;
 
   let resizedPhotoBuffer;
 
@@ -139,25 +169,26 @@ export const generatePassportSheet = async ({ imageUrl, country, copies, widthMm
     throw new AppError("Unable to process image. Please provide a valid image file.", 400, "INVALID_IMAGE_FILE");
   }
 
+  const usedGridWidth = columns * photoWidth + (columns - 1) * spacing;
+  const usedGridHeight = rows * photoHeight + (rows - 1) * spacing;
+  const startX = Math.round((sheetWidth - usedGridWidth) / 2);
+  const startY = Math.round((sheetHeight - usedGridHeight) / 2);
   const composites = Array.from({ length: copies }, (_, index) => {
     const row = Math.floor(index / columns);
     const column = index % columns;
-    const left = margin + column * (photoWidth + spacing);
-    const top = margin + row * (photoHeight + spacing);
-
-    if (left + photoWidth > sheetWidth || top + photoHeight > sheetHeight) {
-      throw new AppError("Passport sheet layout overflowed the canvas.", 500, "SHEET_LAYOUT_OVERFLOW");
-    }
 
     return {
       input: resizedPhotoBuffer,
-      left,
-      top
+      left: startX + column * (photoWidth + spacing),
+      top: startY + row * (photoHeight + spacing)
     };
   });
-
-  const outputFilename = `passport-sheet-${copies}-${Date.now()}.png`;
-  const outputPath = path.join(outputDir, outputFilename);
+  const outputId = Date.now().toString();
+  const outputBase = `passport-sheet-${copies}-${outputId}-${crypto.randomBytes(4).toString("hex")}`;
+  const pngFilename = `${outputBase}.png`;
+  const pdfFilename = `${outputBase}.pdf`;
+  const pngPath = path.join(outputDir, pngFilename);
+  const pdfPath = path.join(outputDir, pdfFilename);
 
   await sharp({
     create: {
@@ -168,13 +199,21 @@ export const generatePassportSheet = async ({ imageUrl, country, copies, widthMm
     }
   })
     .composite(composites)
+    .withMetadata({ density: printDpi })
     .png({ quality: 100, compressionLevel: 9 })
-    .toFile(outputPath);
+    .toFile(pngPath);
+
+  await createPdfFromPng({
+    pngPath,
+    pdfPath,
+    widthPx: sheetWidth,
+    heightPx: sheetHeight
+  });
 
   return {
-    filename: outputFilename,
-    path: outputPath,
-    url: toPublicUrl("output", outputFilename),
+    image: toPublicUrl("output", pngFilename),
+    processedImage: toPublicUrl("output", pngFilename),
+    pdf: toPublicUrl("output", pdfFilename),
     details: {
       country,
       label: passportSize.label,
@@ -190,7 +229,9 @@ export const generatePassportSheet = async ({ imageUrl, country, copies, widthMm
       },
       sheet: {
         widthPx: sheetWidth,
-        heightPx: sheetHeight
+        heightPx: sheetHeight,
+        widthIn: sheetWidth / printDpi,
+        heightIn: sheetHeight / printDpi
       }
     }
   };

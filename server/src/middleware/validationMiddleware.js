@@ -10,6 +10,14 @@ export const validateImageUpload = (req, _res, next) => {
 
 const supportedPassportCountries = ["india", "us", "canada", "custom"];
 const supportedPassportCopies = [3, 6, 9, 12];
+const printReadyCountryAliases = {
+  india: "india",
+  us: "us",
+  "us-visa": "us",
+  us_visa: "us",
+  canada: "canada",
+  custom: "custom"
+};
 
 export const validatePassportSheetRequest = (req, _res, next) => {
   const { imageUrl, country, copies, widthMm, heightMm } = req.body || {};
@@ -74,6 +82,74 @@ export const validatePassportSheetRequest = (req, _res, next) => {
     copies: parsedCopies,
     widthMm: widthMm ? Number(widthMm) : undefined,
     heightMm: heightMm ? Number(heightMm) : undefined
+  };
+
+  next();
+};
+
+export const validatePrintReadyRequest = (req, _res, next) => {
+  const { imageUrl, country, copies, widthMm, heightMm } = req.body || {};
+
+  if (!imageUrl) {
+    return next(new AppError("imageUrl is required.", 400, "IMAGE_URL_REQUIRED"));
+  }
+
+  if (!country) {
+    return next(new AppError("country is required.", 400, "COUNTRY_REQUIRED"));
+  }
+
+  const normalizedCountry = printReadyCountryAliases[String(country).trim().toLowerCase()];
+
+  if (!normalizedCountry) {
+    return next(
+      new AppError(
+        "Invalid country. Supported countries are india, us, us-visa, canada, and custom.",
+        400,
+        "INVALID_COUNTRY"
+      )
+    );
+  }
+
+  const parsedCopies = Number(copies);
+
+  if (!Number.isInteger(parsedCopies) || !supportedPassportCopies.includes(parsedCopies)) {
+    return next(
+      new AppError(
+        "Invalid copies. Supported copy counts are 3, 6, 9, and 12.",
+        400,
+        "INVALID_COPIES"
+      )
+    );
+  }
+
+  const parsedWidth = widthMm ? Number(widthMm) : undefined;
+  const parsedHeight = heightMm ? Number(heightMm) : undefined;
+
+  if (normalizedCountry === "custom") {
+    if (
+      !Number.isFinite(parsedWidth) ||
+      !Number.isFinite(parsedHeight) ||
+      parsedWidth <= 0 ||
+      parsedHeight <= 0 ||
+      parsedWidth > 100 ||
+      parsedHeight > 120
+    ) {
+      return next(
+        new AppError(
+          "Custom dimensions must include valid widthMm and heightMm values.",
+          400,
+          "INVALID_CUSTOM_DIMENSIONS"
+        )
+      );
+    }
+  }
+
+  req.printReadySheet = {
+    imageUrl,
+    country: normalizedCountry,
+    copies: parsedCopies,
+    widthMm: parsedWidth,
+    heightMm: parsedHeight
   };
 
   next();

@@ -3,10 +3,25 @@ import Upload from "./components/Upload.jsx";
 import BackgroundSelector from "./components/BackgroundSelector.jsx";
 import Result from "./components/Result.jsx";
 import EditPanel from "./components/EditPanel.jsx";
-import { changeBackground, removeBackground } from "./services/api.js";
+import PrintReadySection from "./components/PrintReadySection.jsx";
+import api, { changeBackground, removeBackground } from "./services/api.js";
 
 const getErrorMessage = (error, fallback) => {
   return error?.response?.data?.message || error?.message || fallback;
+};
+
+const withCacheBuster = (imageUrl) => `${imageUrl}?t=${Date.now()}`;
+
+const blobUrlToDataUrl = async (blobUrl) => {
+  const response = await fetch(blobUrl);
+  const blob = await response.blob();
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
 };
 
 function App() {
@@ -14,8 +29,13 @@ function App() {
   const [previewUrl, setPreviewUrl] = useState("");
   const [processedImage, setProcessedImage] = useState("");
   const [editedImage, setEditedImage] = useState("");
+  const [passportSheet, setPassportSheet] = useState("");
+  const [passportPdf, setPassportPdf] = useState("");
+  const [country, setCountry] = useState("india");
+  const [selectedCopies, setSelectedCopies] = useState(6);
   const [activeColor, setActiveColor] = useState("");
   const [removeLoading, setRemoveLoading] = useState(false);
+  const [passportLoading, setPassportLoading] = useState(false);
   const [loadingColor, setLoadingColor] = useState("");
   const [hasColorChange, setHasColorChange] = useState(false);
   const [error, setError] = useState("");
@@ -32,10 +52,20 @@ function App() {
     return () => URL.revokeObjectURL(objectUrl);
   }, [selectedFile]);
 
+  useEffect(() => {
+    console.log(passportSheet);
+  }, [passportSheet]);
+
+  useEffect(() => {
+    console.log("Selected copies:", selectedCopies);
+  }, [selectedCopies]);
+
   const handleFileSelect = (file) => {
     setSelectedFile(file);
     setProcessedImage("");
     setEditedImage("");
+    setPassportSheet("");
+    setPassportPdf("");
     setActiveColor("");
     setHasColorChange(false);
     setError("");
@@ -56,8 +86,10 @@ function App() {
         throw new Error("The server did not return a processed image.");
       }
 
-      setProcessedImage(data.processedImage);
+      setProcessedImage(withCacheBuster(data.processedImage));
       setEditedImage("");
+      setPassportSheet("");
+      setPassportPdf("");
       setActiveColor("");
       setHasColorChange(false);
     } catch (err) {
@@ -82,14 +114,64 @@ function App() {
         throw new Error("The server did not return an updated image.");
       }
 
-      setProcessedImage(data.processedImage);
+      setProcessedImage(withCacheBuster(data.processedImage));
       setEditedImage("");
+      setPassportSheet("");
+      setPassportPdf("");
       setActiveColor(color);
       setHasColorChange(true);
     } catch (err) {
       setError(getErrorMessage(err, "Unable to change the background color."));
     } finally {
       setLoadingColor("");
+    }
+  };
+
+  const handleApplyCrop = (croppedImage) => {
+    setEditedImage(croppedImage);
+    setPassportSheet("");
+    setPassportPdf("");
+  };
+
+  const handleGeneratePassport = async () => {
+    const editorImage = editedImage || processedImage;
+
+    if (!editorImage) {
+      setError("Create or edit a passport photo before generating copies.");
+      return;
+    }
+
+    try {
+      setPassportLoading(true);
+      setError("");
+      setPassportSheet("");
+      console.log("Selected copies:", selectedCopies);
+
+      const imageUrl = editorImage.startsWith("blob:")
+        ? await blobUrlToDataUrl(editorImage)
+        : editorImage;
+      console.log("Sending:", {
+        copies: selectedCopies
+      });
+      const res = await api.post("/generate-passport", {
+        imageUrl,
+        country,
+        copies: selectedCopies
+      });
+      console.log("API response:", res.data);
+      if (!res.data.success || !res.data.processedImage) {
+        throw new Error("The server did not return a passport sheet.");
+      }
+
+      setPassportPdf("");
+      setTimeout(() => {
+        setPassportSheet(res.data.processedImage);
+      }, 50);
+    } catch (err) {
+      console.log(err);
+      setError(getErrorMessage(err, "Unable to generate the passport sheet."));
+    } finally {
+      setPassportLoading(false);
     }
   };
 
@@ -112,35 +194,86 @@ function App() {
         </div>
       )}
 
-      <div className="workspace-grid">
-        <div className="left-stack">
-          <Upload
-            selectedFile={selectedFile}
-            previewUrl={previewUrl}
-            loading={removeLoading}
-            onFileSelect={handleFileSelect}
-            onRemoveBackground={handleRemoveBackground}
-          />
-
-          {processedImage && (
-            <BackgroundSelector
-              activeColor={activeColor}
-              loadingColor={loadingColor}
-              onColorChange={handleColorChange}
-            />
-          )}
+      <section>
+        <div className="section-heading">
+          <h2>Image Editor</h2>
         </div>
 
-        <div className="right-stack">
-          <Result image={editedImage || processedImage} />
-          {hasColorChange && (
-            <EditPanel
-              image={editedImage || processedImage}
-              onApplyCrop={setEditedImage}
+        <div className="workspace-grid">
+          <div className="left-stack">
+            <Upload
+              selectedFile={selectedFile}
+              previewUrl={previewUrl}
+              loading={removeLoading}
+              onFileSelect={handleFileSelect}
+              onRemoveBackground={handleRemoveBackground}
             />
-          )}
+
+            {processedImage && (
+              <BackgroundSelector
+                activeColor={activeColor}
+                loadingColor={loadingColor}
+                onColorChange={handleColorChange}
+              />
+            )}
+          </div>
+
+          <div className="right-stack">
+            <Result image={editedImage || processedImage} />
+            {hasColorChange && (
+              <EditPanel
+                image={editedImage || processedImage}
+                onApplyCrop={handleApplyCrop}
+              />
+            )}
+          </div>
         </div>
-      </div>
+      </section>
+
+      <section className="panel">
+        <div className="section-heading">
+          <h2>Passport Options</h2>
+        </div>
+
+        <div className="control-grid">
+          <label className="range-control">
+            <span>Country</span>
+            <select value={country} onChange={(event) => setCountry(event.target.value)}>
+              <option value="india">India</option>
+              <option value="us">US</option>
+              <option value="canada">Canada</option>
+            </select>
+          </label>
+
+          <div className="range-control">
+            <span>Copies</span>
+            <div className="copy-button-group">
+              {[3, 6, 9, 12].map((num) => (
+                <button
+                  className={`ghost-button ${selectedCopies === num ? "selected" : ""}`}
+                  key={num}
+                  type="button"
+                  onClick={() => setSelectedCopies(num)}
+                >
+                  {num}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <button
+          className="primary-button"
+          type="button"
+          disabled={passportLoading || !(editedImage || processedImage)}
+          onClick={handleGeneratePassport}
+        >
+          {passportLoading && <span className="spinner" aria-hidden="true" />}
+          {passportLoading ? "Generating..." : "Generate Passport Sheet"}
+        </button>
+      </section>
+
+      <PrintReadySection passportSheet={passportSheet} passportPdf={passportPdf} />
     </main>
   );
 }

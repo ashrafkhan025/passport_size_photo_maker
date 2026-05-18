@@ -227,6 +227,17 @@ button:disabled {
   background: #dce6ef;
 }
 
+.ghost-button.selected {
+  background: #247a8b;
+  color: #ffffff;
+}
+
+.copy-button-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .apply-button {
   min-height: 40px;
   padding: 0 16px;
@@ -325,6 +336,45 @@ button:disabled {
   padding: 0 18px;
   background: #eaf6f7;
   color: #176879;
+}
+
+.print-ready-panel {
+  margin-top: 22px;
+}
+
+.print-ready-frame {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  aspect-ratio: auto;
+  overflow: visible;
+  background-color: #ffffff;
+}
+
+.print-ready-frame img {
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  max-height: none;
+  object-fit: contain;
+}
+
+.print-ready-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.print-ready-empty {
+  display: grid;
+  place-items: center;
+  min-height: 180px;
+  margin: 0;
+  color: #697789;
+  text-align: center;
 }
 
 .edit-panel {

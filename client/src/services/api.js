@@ -27,4 +27,14 @@ export const changeBackground = async ({ imageUrl, color }) => {
   return data;
 };
 
+export const generatePassport = async ({ imageUrl, country, copies }) => {
+  const { data } = await api.post("/generate-passport", {
+    imageUrl,
+    country,
+    copies
+  });
+
+  return data;
+};
+
 export default api;
