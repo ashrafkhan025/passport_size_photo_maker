@@ -1,6 +1,7 @@
 import fs from "fs/promises";
 import path from "path";
 import crypto from "crypto";
+import sharp from "sharp";
 import ImageJob from "../models/ImageJob.js";
 import { outputDir, toPublicUrl } from "../config/storage.js";
 import { removeBackground } from "../services/backgroundRemovalService.js";
@@ -25,6 +26,12 @@ export const removeBgController = async (req, res, next) => {
       status: "pending"
     });
 
+    const metadata = await sharp(uploadedFile.path).metadata();
+    const warning =
+      metadata.width < 600 || metadata.height < 600
+        ? "Low quality image. Print may be blurry."
+        : undefined;
+
     const processedImageBuffer = await removeBackground(uploadedFile.path);
     const processedFilename = `${path.parse(uploadedFile.filename).name}-${crypto
       .randomBytes(4)
@@ -48,6 +55,7 @@ export const removeBgController = async (req, res, next) => {
       originalImage: originalUrl,
       processedImage: processedUrl,
       jobId: imageJob._id,
+      warning,
       message: "Background removed successfully"
     });
   } catch (error) {

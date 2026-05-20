@@ -45,6 +45,7 @@ function App() {
   const [loadingColor, setLoadingColor] = useState("");
   const [hasColorChange, setHasColorChange] = useState(false);
   const [error, setError] = useState("");
+  const [qualityWarning, setQualityWarning] = useState("");
 
   useEffect(() => {
     if (!selectedFile) {
@@ -76,6 +77,7 @@ function App() {
     setActiveColor("");
     setHasColorChange(false);
     setError("");
+    setQualityWarning("");
   };
 
   const handleRemoveBackground = async () => {
@@ -100,6 +102,7 @@ function App() {
       setPassportPdf("");
       setActiveColor("");
       setHasColorChange(false);
+      setQualityWarning(data.warning || "");
     } catch (err) {
       setError(getErrorMessage(err, "Unable to remove the background."));
     } finally {
@@ -163,6 +166,7 @@ function App() {
     setLoadingColor("");
     setHasColorChange(false);
     setError("");
+    setQualityWarning("");
     setResetToken((current) => current + 1);
   };
 
@@ -230,6 +234,13 @@ function App() {
       {error && (
         <div className="alert" role="alert">
           {error}
+        </div>
+      )}
+
+      {qualityWarning && (
+        <div className="warning-card" role="status">
+          <strong>⚠ Low quality image</strong>
+          <span>Print may be blurry</span>
         </div>
       )}
 

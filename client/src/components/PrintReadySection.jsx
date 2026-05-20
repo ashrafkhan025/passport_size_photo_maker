@@ -1,4 +1,8 @@
 const PrintReadySection = ({ passportSheet, passportPdf }) => {
+  const handlePrint = () => {
+    window.print();
+  };
+
   return (
     <section className="panel result-panel print-ready-panel">
       <div className="section-heading">
@@ -22,6 +26,10 @@ const PrintReadySection = ({ passportSheet, passportPdf }) => {
           </div>
 
           <div className="print-ready-actions">
+            <button className="download-link print-now-button" type="button" onClick={handlePrint}>
+              Print Now
+            </button>
+
             <a
               className="download-link"
               href={passportSheet}

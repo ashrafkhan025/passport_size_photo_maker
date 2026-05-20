@@ -385,6 +385,10 @@ button:disabled {
   color: #176879;
 }
 
+.print-now-button {
+  cursor: pointer;
+}
+
 .print-ready-panel {
   margin-top: 22px;
 }
@@ -695,6 +699,25 @@ button:disabled {
   font-weight: 700;
 }
 
+.warning-card {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 18px;
+  padding: 14px 16px;
+  border: 1px solid #f4d27a;
+  border-radius: 8px;
+  background: #fff8e6;
+  color: #7a4b00;
+}
+
+.warning-card strong {
+  font-weight: 800;
+}
+
+.warning-card span {
+  color: #8a6117;
+}
+
 @media (max-width: 900px) {
   .app-header {
     display: grid;
@@ -739,5 +762,38 @@ button:disabled {
   .custom-paper-control,
   .cut-lines-control {
     grid-template-columns: 1fr;
+  }
+}
+
+@media print {
+  body {
+    min-width: 0;
+    background: #ffffff;
+  }
+
+  .app-shell > :not(.print-ready-panel),
+  .print-ready-panel .section-heading,
+  .print-ready-actions {
+    display: none !important;
+  }
+
+  .app-shell,
+  .print-ready-panel,
+  .print-ready-frame {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    box-shadow: none;
+    background: #ffffff;
+  }
+
+  .print-ready-frame {
+    display: block;
+  }
+
+  .print-ready-frame img {
+    width: 100%;
+    max-width: 100%;
   }
 }
