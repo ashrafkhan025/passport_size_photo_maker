@@ -28,6 +28,7 @@ const blobUrlToDataUrl = async (blobUrl) => {
 function App() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState("");
+  const [transparentImage, setTransparentImage] = useState("");
   const [processedImage, setProcessedImage] = useState("");
   const [editedImage, setEditedImage] = useState("");
   const [passportSheet, setPassportSheet] = useState("");
@@ -67,6 +68,7 @@ function App() {
 
   const handleFileSelect = (file) => {
     setSelectedFile(file);
+    setTransparentImage("");
     setProcessedImage("");
     setEditedImage("");
     setPassportSheet("");
@@ -91,6 +93,7 @@ function App() {
         throw new Error("The server did not return a processed image.");
       }
 
+      setTransparentImage(data.processedImage);
       setProcessedImage(withCacheBuster(data.processedImage));
       setEditedImage("");
       setPassportSheet("");
@@ -105,7 +108,7 @@ function App() {
   };
 
   const handleColorChange = async (color) => {
-    if (!processedImage) {
+    if (!transparentImage) {
       setError("Remove the background before choosing a color.");
       return;
     }
@@ -114,7 +117,7 @@ function App() {
       setLoadingColor(color);
       setError("");
 
-      const data = await changeBackground({ imageUrl: processedImage, color });
+      const data = await changeBackground({ imageUrl: transparentImage, color });
       if (!data.success || !data.processedImage) {
         throw new Error("The server did not return an updated image.");
       }
@@ -144,6 +147,7 @@ function App() {
     }
 
     setSelectedFile(null);
+    setTransparentImage("");
     setProcessedImage("");
     setEditedImage("");
     setPassportSheet("");
