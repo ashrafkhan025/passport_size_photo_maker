@@ -1,3 +1,5 @@
+import { useDropzone } from "react-dropzone";
+
 const Upload = ({
   selectedFile,
   previewUrl,
@@ -5,12 +7,22 @@ const Upload = ({
   onFileSelect,
   onRemoveBackground
 }) => {
-  const handleChange = (event) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      onFileSelect(file);
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    accept: {
+      "image/jpeg": [".jpg", ".jpeg"],
+      "image/png": [".png"],
+      "image/webp": [".webp"]
+    },
+    maxFiles: 1,
+    multiple: false,
+    onDrop: (acceptedFiles) => {
+      const file = acceptedFiles[0];
+
+      if (file) {
+        onFileSelect(file);
+      }
     }
-  };
+  });
 
   return (
     <section className="panel upload-panel">
@@ -19,12 +31,17 @@ const Upload = ({
         <h2>Upload Photo</h2>
       </div>
 
-      <label className="upload-dropzone">
-        <input type="file" accept="image/*" onChange={handleChange} />
+      <div
+        className={`upload-dropzone ${isDragActive ? "is-drag-active" : ""}`}
+        {...getRootProps()}
+      >
+        <input {...getInputProps()} />
         <span className="upload-icon">+</span>
-        <strong>{selectedFile ? selectedFile.name : "Choose an image"}</strong>
-        <small>JPG, JPEG, or PNG</small>
-      </label>
+        <strong>{selectedFile ? selectedFile.name : "Drop image here"}</strong>
+        <small>or</small>
+        <span className="upload-link">Click to Upload</span>
+        <small>JPG, JPEG, PNG, or WEBP</small>
+      </div>
 
       {previewUrl && (
         <div className="image-preview">

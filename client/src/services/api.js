@@ -37,4 +37,26 @@ export const generatePassport = async ({ imageUrl, country, copies }) => {
   return data;
 };
 
+export const generatePrintReady = async ({
+  imageUrl,
+  country,
+  copies,
+  paperSize,
+  width,
+  height,
+  showCutLines
+}) => {
+  const { data } = await api.post("/generate-print-ready", {
+    imageUrl,
+    country,
+    copies,
+    paperSize,
+    width,
+    height,
+    showCutLines
+  });
+
+  return data;
+};
+
 export default api;

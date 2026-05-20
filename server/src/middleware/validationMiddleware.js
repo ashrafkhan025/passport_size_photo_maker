@@ -10,6 +10,7 @@ export const validateImageUpload = (req, _res, next) => {
 
 const supportedPassportCountries = ["india", "us", "canada", "custom"];
 const supportedPassportCopies = [3, 6, 9, 12];
+const supportedPaperSizes = ["4x6", "a4", "letter", "custom"];
 const printReadyCountryAliases = {
   india: "india",
   us: "us",
@@ -88,7 +89,17 @@ export const validatePassportSheetRequest = (req, _res, next) => {
 };
 
 export const validatePrintReadyRequest = (req, _res, next) => {
-  const { imageUrl, country, copies, widthMm, heightMm } = req.body || {};
+  const {
+    imageUrl,
+    country,
+    copies,
+    widthMm,
+    heightMm,
+    paperSize = "4x6",
+    width,
+    height,
+    showCutLines = false
+  } = req.body || {};
 
   if (!imageUrl) {
     return next(new AppError("imageUrl is required.", 400, "IMAGE_URL_REQUIRED"));
@@ -124,6 +135,17 @@ export const validatePrintReadyRequest = (req, _res, next) => {
 
   const parsedWidth = widthMm ? Number(widthMm) : undefined;
   const parsedHeight = heightMm ? Number(heightMm) : undefined;
+  const normalizedPaperSize = String(paperSize).trim().toLowerCase();
+
+  if (!supportedPaperSizes.includes(normalizedPaperSize)) {
+    return next(
+      new AppError(
+        "Invalid paperSize. Supported paper sizes are 4x6, A4, Letter, and Custom.",
+        400,
+        "INVALID_PAPER_SIZE"
+      )
+    );
+  }
 
   if (normalizedCountry === "custom") {
     if (
@@ -144,12 +166,38 @@ export const validatePrintReadyRequest = (req, _res, next) => {
     }
   }
 
+  const parsedPaperWidth = width ? Number(width) : undefined;
+  const parsedPaperHeight = height ? Number(height) : undefined;
+
+  if (normalizedPaperSize === "custom") {
+    if (
+      !Number.isFinite(parsedPaperWidth) ||
+      !Number.isFinite(parsedPaperHeight) ||
+      parsedPaperWidth <= 0 ||
+      parsedPaperHeight <= 0 ||
+      parsedPaperWidth > 30 ||
+      parsedPaperHeight > 30
+    ) {
+      return next(
+        new AppError(
+          "Custom paper size must include valid width and height values in inches.",
+          400,
+          "INVALID_CUSTOM_PAPER_SIZE"
+        )
+      );
+    }
+  }
+
   req.printReadySheet = {
     imageUrl,
     country: normalizedCountry,
     copies: parsedCopies,
     widthMm: parsedWidth,
-    heightMm: parsedHeight
+    heightMm: parsedHeight,
+    paperSize: normalizedPaperSize,
+    width: parsedPaperWidth,
+    height: parsedPaperHeight,
+    showCutLines: Boolean(showCutLines)
   };
 
   next();

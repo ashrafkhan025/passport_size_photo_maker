@@ -4,7 +4,8 @@ import BackgroundSelector from "./components/BackgroundSelector.jsx";
 import Result from "./components/Result.jsx";
 import EditPanel from "./components/EditPanel.jsx";
 import PrintReadySection from "./components/PrintReadySection.jsx";
-import api, { changeBackground, removeBackground } from "./services/api.js";
+import BeforeAfterCompare from "./components/BeforeAfterCompare.jsx";
+import { changeBackground, generatePrintReady, removeBackground } from "./services/api.js";
 
 const getErrorMessage = (error, fallback) => {
   return error?.response?.data?.message || error?.message || fallback;
@@ -33,6 +34,10 @@ function App() {
   const [passportPdf, setPassportPdf] = useState("");
   const [country, setCountry] = useState("india");
   const [selectedCopies, setSelectedCopies] = useState(6);
+  const [paperSize, setPaperSize] = useState("4x6");
+  const [customPaper, setCustomPaper] = useState({ width: "4", height: "6" });
+  const [showCutLines, setShowCutLines] = useState(false);
+  const [resetToken, setResetToken] = useState(0);
   const [activeColor, setActiveColor] = useState("");
   const [removeLoading, setRemoveLoading] = useState(false);
   const [passportLoading, setPassportLoading] = useState(false);
@@ -133,6 +138,30 @@ function App() {
     setPassportPdf("");
   };
 
+  const handleStartOver = () => {
+    if (!window.confirm("Start over? Current work will be lost.")) {
+      return;
+    }
+
+    setSelectedFile(null);
+    setProcessedImage("");
+    setEditedImage("");
+    setPassportSheet("");
+    setPassportPdf("");
+    setCountry("india");
+    setSelectedCopies(6);
+    setPaperSize("4x6");
+    setCustomPaper({ width: "4", height: "6" });
+    setShowCutLines(false);
+    setActiveColor("");
+    setRemoveLoading(false);
+    setPassportLoading(false);
+    setLoadingColor("");
+    setHasColorChange(false);
+    setError("");
+    setResetToken((current) => current + 1);
+  };
+
   const handleGeneratePassport = async () => {
     const editorImage = editedImage || processedImage;
 
@@ -145,27 +174,33 @@ function App() {
       setPassportLoading(true);
       setError("");
       setPassportSheet("");
+      setPassportPdf("");
       console.log("Selected copies:", selectedCopies);
 
       const imageUrl = editorImage.startsWith("blob:")
         ? await blobUrlToDataUrl(editorImage)
         : editorImage;
       console.log("Sending:", {
-        copies: selectedCopies
+        copies: selectedCopies,
+        paperSize
       });
-      const res = await api.post("/generate-passport", {
+      const data = await generatePrintReady({
         imageUrl,
         country,
-        copies: selectedCopies
+        copies: selectedCopies,
+        paperSize,
+        width: paperSize === "custom" ? customPaper.width : undefined,
+        height: paperSize === "custom" ? customPaper.height : undefined,
+        showCutLines
       });
-      console.log("API response:", res.data);
-      if (!res.data.success || !res.data.processedImage) {
+      console.log("API response:", data);
+      if (!data.success || !data.image) {
         throw new Error("The server did not return a passport sheet.");
       }
 
-      setPassportPdf("");
+      setPassportPdf(data.pdf || "");
       setTimeout(() => {
-        setPassportSheet(res.data.processedImage);
+        setPassportSheet(data.image);
       }, 50);
     } catch (err) {
       console.log(err);
@@ -202,6 +237,7 @@ function App() {
         <div className="workspace-grid">
           <div className="left-stack">
             <Upload
+              key={`upload-${resetToken}`}
               selectedFile={selectedFile}
               previewUrl={previewUrl}
               loading={removeLoading}
@@ -220,13 +256,23 @@ function App() {
 
           <div className="right-stack">
             <Result image={editedImage || processedImage} />
+            {previewUrl && processedImage && (
+              <BeforeAfterCompare originalImage={previewUrl} processedImage={processedImage} />
+            )}
             {hasColorChange && (
               <EditPanel
+                key={`editor-${resetToken}`}
                 image={editedImage || processedImage}
                 onApplyCrop={handleApplyCrop}
               />
             )}
           </div>
+        </div>
+
+        <div className="start-over-actions">
+          <button className="start-over-button" type="button" onClick={handleStartOver}>
+            Start Over
+          </button>
         </div>
       </section>
 
@@ -258,6 +304,73 @@ function App() {
                   {num}
                 </button>
               ))}
+            </div>
+          </div>
+
+          <div className="range-control paper-size-control">
+            <span>Paper Size</span>
+            <div className="copy-button-group">
+              {[
+                { value: "4x6", label: "4x6 Photo Paper" },
+                { value: "a4", label: "A4" },
+                { value: "letter", label: "Letter" },
+                { value: "custom", label: "Custom" }
+              ].map((option) => (
+                <button
+                  className={`ghost-button ${paperSize === option.value ? "selected" : ""}`}
+                  key={option.value}
+                  type="button"
+                  onClick={() => setPaperSize(option.value)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {paperSize === "custom" && (
+            <div className="range-control custom-paper-control">
+              <span>Custom</span>
+              <input
+                min="1"
+                step="0.1"
+                type="number"
+                value={customPaper.width}
+                onChange={(event) =>
+                  setCustomPaper((current) => ({ ...current, width: event.target.value }))
+                }
+                aria-label="Custom paper width in inches"
+              />
+              <input
+                min="1"
+                step="0.1"
+                type="number"
+                value={customPaper.height}
+                onChange={(event) =>
+                  setCustomPaper((current) => ({ ...current, height: event.target.value }))
+                }
+                aria-label="Custom paper height in inches"
+              />
+            </div>
+          )}
+
+          <div className="range-control cut-lines-control">
+            <span>Show Cut Lines</span>
+            <div className="toggle-button-group" role="group" aria-label="Show cut lines">
+              <button
+                className={`ghost-button ${showCutLines ? "selected" : ""}`}
+                type="button"
+                onClick={() => setShowCutLines(true)}
+              >
+                ON
+              </button>
+              <button
+                className={`ghost-button ${!showCutLines ? "selected" : ""}`}
+                type="button"
+                onClick={() => setShowCutLines(false)}
+              >
+                OFF
+              </button>
             </div>
           </div>
         </div>
