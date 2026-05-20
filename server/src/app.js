@@ -14,11 +14,12 @@ import { notFoundHandler, errorHandler } from "./middleware/errorMiddleware.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const app = express();
+const allowedClientUrl = process.env.CLIENT_URL?.replace(/\/$/, "");
 
 app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || "*",
+    origin: allowedClientUrl || "*",
     credentials: true
   })
 );
