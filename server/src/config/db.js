@@ -4,13 +4,24 @@ const connectDB = async () => {
   const mongoUri = process.env.MONGO_URI;
 
   if (!mongoUri) {
-    throw new Error("MONGO_URI is missing from environment variables");
+    console.warn("MONGO_URI is missing. Continuing without database logging.");
+    return false;
   }
 
   mongoose.set("strictQuery", true);
 
-  const connection = await mongoose.connect(mongoUri);
-  console.log(`MongoDB connected: ${connection.connection.host}`);
+  try {
+    const connection = await mongoose.connect(mongoUri);
+    console.log(`MongoDB connected: ${connection.connection.host}`);
+    return true;
+  } catch (error) {
+    if (process.env.DB_REQUIRED === "true") {
+      throw error;
+    }
+
+    console.warn(`MongoDB unavailable. Continuing without database logging: ${error.message}`);
+    return false;
+  }
 };
 
 export default connectDB;

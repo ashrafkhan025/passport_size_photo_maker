@@ -2,6 +2,7 @@ import fs from "fs/promises";
 import path from "path";
 import crypto from "crypto";
 import sharp from "sharp";
+import mongoose from "mongoose";
 import ImageJob from "../models/ImageJob.js";
 import { outputDir, toPublicUrl } from "../config/storage.js";
 import { removeBackground } from "../services/backgroundRemovalService.js";
@@ -15,16 +16,18 @@ export const removeBgController = async (req, res, next) => {
   try {
     const originalUrl = toPublicUrl("uploads", uploadedFile.filename);
 
-    imageJob = await ImageJob.create({
-      originalImage: {
-        filename: uploadedFile.filename,
-        path: uploadedFile.path,
-        url: originalUrl,
-        mimetype: uploadedFile.mimetype,
-        size: uploadedFile.size
-      },
-      status: "pending"
-    });
+    if (mongoose.connection.readyState === 1) {
+      imageJob = await ImageJob.create({
+        originalImage: {
+          filename: uploadedFile.filename,
+          path: uploadedFile.path,
+          url: originalUrl,
+          mimetype: uploadedFile.mimetype,
+          size: uploadedFile.size
+        },
+        status: "pending"
+      });
+    }
 
     const metadata = await sharp(uploadedFile.path).metadata();
     const warning =
@@ -42,19 +45,21 @@ export const removeBgController = async (req, res, next) => {
 
     const processedUrl = toPublicUrl("output", processedFilename);
 
-    imageJob.processedImage = {
-      filename: processedFilename,
-      path: outputPath,
-      url: processedUrl
-    };
-    imageJob.status = "completed";
-    await imageJob.save();
+    if (imageJob) {
+      imageJob.processedImage = {
+        filename: processedFilename,
+        path: outputPath,
+        url: processedUrl
+      };
+      imageJob.status = "completed";
+      await imageJob.save();
+    }
 
     return res.status(200).json({
       success: true,
       originalImage: originalUrl,
       processedImage: processedUrl,
-      jobId: imageJob._id,
+      jobId: imageJob?._id,
       warning,
       message: "Background removed successfully"
     });
